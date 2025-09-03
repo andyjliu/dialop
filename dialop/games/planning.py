@@ -5,7 +5,7 @@ import random
 import json
 import time
 from collections import defaultdict
-from flask import current_app, has_request_context
+# from flask import current_app, has_request_context
 import numpy as np
 from ruamel.yaml import YAML
 yaml = YAML(typ='safe')
@@ -72,14 +72,9 @@ class PlanningGame(DialogueGame):
         return game
 
     def _load_data(self):
-        # Check whether we're running locally or in a flask server
-        if has_request_context():
-            dataf = os.path.join(current_app.static_folder, "travel_data.yaml")
-            locf = os.path.join(current_app.static_folder, "locations.geojson")
-        else:
-            dirname = os.path.dirname(__file__)
-            dataf = f"{dirname}/data/planning.yaml"
-            locf = f"{dirname}/data/locations.geojson"
+        dirname = os.path.dirname(__file__)
+        dataf = f"{dirname}/data/planning.yaml"
+        locf = f"{dirname}/data/locations.geojson"
         self.game_data = yaml.load(open(dataf, "r"))
         locs = [x["geometry"]["coordinates"] for x in \
                 json.load(open(locf, "r"))["features"]]

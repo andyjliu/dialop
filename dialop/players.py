@@ -1,24 +1,16 @@
 import json
-import openai
 import os
 import pathlib
 from rich.prompt import IntPrompt, Prompt
 from rich.markup import escape
-
 from envs import DialogueEnv
 from utils import num_tokens
 
-try:
-    with open(pathlib.Path(__file__).parent / ".api_key") as f:
-        x = json.load(f)
-        openai.organization = x["organization"]
-        openai.api_key = x["api_key"]
-    print("Loaded .api_key")
-except:
-    openai.api_key = os.getenv("OPENAI_API_KEY")
+from matrix import Cli
+from matrix.client import query_llm
 
-if not openai.api_key:
-    print("Warning: no OpenAI API key loaded.")
+MAX_PROMPT_LENGTH = 8192 # changed from original 4096 to avoid excessive OOC errors
+MAX_RESPONSE_LENGTH = 512 # changed from original 128 due to model verbosity
 
 class OutOfContextError(Exception):
     pass
@@ -48,12 +40,12 @@ class DryRunPlayer:
 
 class LLMPlayer:
 
-    def __init__(self, prompt, role, console, model_kwargs=None,
+    def __init__(self, prompt, role, console, model='gpt-4o', model_kwargs=None,
                  prefix="\nYou:", optional=None):
         self.prompt = prompt
         self.role = role
         self.console = console
-        self.model = "text-davinci-003"
+        self.model = model
         self.optional = optional
         self.removed_optional = False
         if self.role in ["user", "agent", "user0", "user1"]:
@@ -73,7 +65,7 @@ class LLMPlayer:
         if model_kwargs is not None:
             self.model_kwargs.update(**model_kwargs)
         self.prefix = prefix
-    #    self.model = "gpt-3.5-turbo"
+        self.metadata = Cli().get_app_metadata(app_name=self.model)
 
     def observe(self, obs):
         self.prompt += obs
@@ -83,33 +75,42 @@ class LLMPlayer:
         if not self.prompt.endswith(self.prefix):
             self.prompt += self.prefix
         #self.console.print(escape(self.prompt))
-        remaining = 4096 - num_tokens(self.prompt)
+        remaining = MAX_PROMPT_LENGTH - num_tokens(self.prompt)
         if remaining < 0 and self.optional:
             self._remove_optional_context()
-            remaining = 4096 - num_tokens(self.prompt)
+            remaining = MAX_PROMPT_LENGTH - num_tokens(self.prompt)
         # Still out of context after removing
         if remaining < 0:
             print("OUT OF CONTEXT! Remaining ", remaining)
             raise OutOfContextError()
-        kwargs = dict(
-            prompt=self.prompt,
-            max_tokens=min(remaining, 128),
-        )
-        kwargs.update(**self.model_kwargs)
-        response = openai.Completion.create(**kwargs)
+            
+        response = query_llm.batch_requests(
+            url=self.metadata['endpoints']['head'],
+            model=self.metadata['model_name'],
+            app_name=self.metadata['name'],
+            requests=[{"messages": [{'role': 'user', 'content': self.prompt}], **self.model_kwargs}],
+            max_tokens=min(remaining, MAX_RESPONSE_LENGTH)
+        )[0]['response']
+        
         self.console.print("Response: ",
-                           escape(response["choices"][0]["text"].strip()))
-        self.console.print("stop: ", response["choices"][0]["finish_reason"])
-        if response["choices"][0]["finish_reason"] == "length":
+                           escape(response["text"][0].strip()))
+        self.console.print("stop: ", response["finish_reason"][0])
+        if response["finish_reason"] == "length":
             if not self.optional:
                 raise OutOfContextError()
             self._remove_optional_context()
-            response = openai.Completion.create(**kwargs)
+            response = query_llm.batch_requests(
+                url=self.metadata['endpoints']['head'],
+                model=self.metadata['model_name'],
+                app_name=self.metadata['name'],
+                requests=[{"messages": [{'role': 'user', 'content': self.prompt}], **self.model_kwargs}],
+                max_tokens=min(remaining, MAX_RESPONSE_LENGTH)
+            )
             self.console.print("Response: ",
-                               escape(response["choices"][0]["text"].strip()))
-            self.console.print("stop: ", response["choices"][0]["finish_reason"])
+                               escape(response["text"][0].strip()))
+            self.console.print("stop: ", response["finish_reason"][0])
         self.console.print(response["usage"])
-        return response["choices"][0]["text"].strip()
+        return response["text"][0].strip()
 
     def _remove_optional_context(self):
         print("Cutting out optional context from prompt.")

@@ -1,12 +1,13 @@
 from copy import deepcopy
 
 import numpy as np
-import openai
 import pyparsing as pp
 from pyparsing import OneOrMore, Suppress, delimited_list, one_of
 from pyparsing.exceptions import ParseException
-
 from dialop.templates import QueryExecutorTemplate
+
+from matrix import Cli
+from matrix.client import query_llm
 
 
 def create_search_api():
@@ -134,10 +135,20 @@ class StaticQueryExecutor:
             return internal_name_to_api[key]
         return key
 
-class GPT3QueryExecutor:
+class GPTQueryExecutor:
     def __init__(self, sites):
         self.prompt = self._construct_prompt(sites)
-        self.model = "text-davinci-003"
+        self.model = "gpt-4o"
+        self.model_kwargs = dict(
+            model=self.model,
+            temperature=0.1,
+            max_tokens=256,
+            top_p=.95,
+            frequency_penalty=0,
+            presence_penalty=0,
+            stop=["\n\n", "Query", "Query:"]
+        )
+        self.metadata = Cli().get_app_metadata(app_name=self.model)
 
     def _construct_prompt(self, sites):
         sites = deepcopy(sites)
@@ -174,18 +185,15 @@ class GPT3QueryExecutor:
 
     def __call__(self, query_str):
         prompt = self.prompt + f"Query: {query_str}\nResult:\n"
-        response = openai.Completion.create(
-            model=self.model,
-            prompt=prompt,
-            temperature=0.1,
-            max_tokens=256,
-            top_p=.95,
-            frequency_penalty=0,
-            presence_penalty=0,
-            stop=["\n\n", "Query", "Query:"]
-        )
+        response = query_llm.batch_requests(
+            url=self.metadata['endpoints']['head'],
+            model=self.metadata['model_name'],
+            app_name=self.metadata['name'],
+            requests=[{"messages": [{'role': 'user', 'content': self.prompt}], **self.model_kwargs}],
+            max_tokens=min(remaining, MAX_RESPONSE_LENGTH)
+        )[0]['response']
         print(response)
-        return response["choices"][0]["text"]
+        return response["text"][0].strip()
 
     def distance(self, s1, s2) -> float:
         dist = np.linalg.norm(np.array(s1["loc"]) - np.array(s2["loc"]))

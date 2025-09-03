@@ -10,12 +10,12 @@ from dialop.templates import (
     PlanningAgentPromptTemplate,
 )
 from dialop.planning_query_executor import (
-  StaticQueryExecutor, GPT3QueryExecutor, SearchError
+  StaticQueryExecutor, GPTQueryExecutor, SearchError
 )
 
 class PlanningEnv(DialogueEnv):
 
-    def __init__(self, query_executor="gpt3"):
+    def __init__(self, query_executor="gpt"):
         self.players = ["user", "agent"]
         datapath = Path(__file__).parent / "data"
         self.instructions = [
@@ -25,8 +25,8 @@ class PlanningEnv(DialogueEnv):
         self.query_executor = query_executor
         if query_executor == "static":
             self._search_cls = StaticQueryExecutor
-        elif query_executor == "gpt3":
-            self._search_cls = GPT3QueryExecutor
+        elif query_executor == "gpt":
+            self._search_cls = GPTQueryExecutor
         else:
             raise NotImplementedError
 
