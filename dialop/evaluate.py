@@ -7,10 +7,11 @@ from typing import Optional, Literal
 from itertools import cycle
 
 import numpy as np
-import tyro
+import argparse
 from ruamel.yaml import YAML
 from rich import print
 from rich.console import Console
+import sys
 console = Console()
 
 from envs import (
@@ -28,6 +29,7 @@ from players import (
     OutOfContextError
 )
 from utils import Logger, retry, count_words
+from metrics import make_exp_name, aggregate_metrics, write_to_wandb
 
 FPATH = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))
 RESDIR = pathlib.Path("/home/andyjliu/andy-fa25/dialop/results/")
@@ -250,19 +252,35 @@ def run(
     log.flush()
     log.close()
 
+def main():
+    parser = argparse.ArgumentParser(description="Evaluate collaborative gym experiments.")
+    parser.add_argument('--exp_name', type=str, required=True, help='Experiment name')
+    parser.add_argument('--game', type=str, choices=['matching', 'itinerary', 'mediation'], required=True, help='Game type')
+    parser.add_argument('--mode', type=str, choices=['selfplay', 'prompted_sp'], required=True, help='Evaluation mode')
+    parser.add_argument('--resume', type=int, default=0, help='Resume index')
+    parser.add_argument('--end', type=int, default=1000, help='End index')
+    parser.add_argument('--samples_per_game', type=int, default=1, help='Samples per game')
+    parser.add_argument('--temperature', type=float, default=0.1, help='Model temperature')
+    parser.add_argument('--dry_run', type=lambda x: (str(x).lower() == 'true'), default=False, help='Dry run mode')
+    parser.add_argument('--use_word_limit', type=lambda x: (str(x).lower() == 'true'), default=False, help='Use word limit')
+    parser.add_argument('--model', type=str, default=None, help='Model name')
+    parser.add_argument('--wandb', type=lambda x: (str(x).lower() == 'true'), default=False, help='Use wandb')
+    parser.add_argument('--wandb_project', type=str, default='dialop', help='Wandb project name')
 
-def main(
-    exp_name: str,
-    game: Literal["matching", "itinerary", "mediation"],
-    mode: Literal["selfplay", "prompted_sp"],
-    resume: Optional[int]=0,
-    end: Optional[int]=1000,
-    samples_per_game: Optional[int]=1,
-    temperature: Optional[float]=0.1,
-    dry_run: Optional[bool]=False,
-    use_word_limit: Optional[bool]=False,
-    model: Optional[str]=None,
-):
+    args = parser.parse_args()
+
+    exp_name = args.exp_name
+    game = args.game
+    mode = args.mode
+    resume = args.resume
+    end = args.end
+    samples_per_game = args.samples_per_game
+    temperature = args.temperature
+    dry_run = args.dry_run
+    use_word_limit = args.use_word_limit
+    model = args.model
+    wandb = args.wandb
+    wandb_project = args.wandb_project
 
     game_cls = GAME_CLSS[game]
     EXP_DIR = RESDIR / game
@@ -294,12 +312,6 @@ def main(
             with open(FPATH / "prompts" / "optimization.txt") as f:
                 matching_prompt = f.read()
         elif game_cls == PlanningEnv:
-            # if use_word_limit:
-            #     with open(FPATH / "prompts" / "itinerary_agent_timed.txt") as f:
-            #         agent_prompt = f.read()
-            #     with open(FPATH / "prompts" / "itinerary_user_timed.txt") as f:
-            #         user_prompt = f.read()
-            # else:
             with open(FPATH / "prompts" / "planning_agent.txt") as f:
                 agent_prompt = f.read()
             with open(FPATH / "prompts" / "planning_user.txt") as f:
@@ -406,20 +418,14 @@ def main(
         times.append(elapsed)
         print(f" == Finished {i} {elapsed:.1f} == ")
 
+    if not exp_name:
+        exp_name = make_exp_name(exp_name)
+    avg_metrics = aggregate_metrics(EXP_DIR, exp_name)
+    if wandb:
+        args_dict = vars(args)
+        write_to_wandb(avg_metrics, args_dict, wandb_project=wandb_project, exp_name=exp_name)
+    
     exit()
 
-    #with open("query_executor_prompt.txt", "w") as f:
-    #    f.write(env.search.prompt)
-    #test_queries = [
-    #    "Search(fields=[name], text_query='not touristy', filters=[category == restaurant]"
-    #]
-    #env.search(test_queries[0])
-
-    # Try scoring a proposal
-    #proposal = "[The Dive, Saul's, NULL]"
-    #proposal_info = env._propose(proposal)
-    #print(proposal_info)
-
-
 if __name__ == "__main__":
-    tyro.cli(main)
+    main()
