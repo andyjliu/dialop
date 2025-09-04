@@ -2,17 +2,6 @@ You are traveling to a new city and consulting a travel agent. For each city, yo
 
 Your objective is to maximize the "Final Score" at the end of the chat, which scores how well the itinerary you agreed on matches your preferences.
 
-Each turn, you can take one of the following actions:
-A message action sends a free-text message to your partner about anything that you would like to discuss.
-(Example message action: [message] It's not bad so far, I'd really like to stop by Mad Seoul though.)
-If the agent makes a full proposal (which will contain a [propose] tag and three non-null items), you can also think, accept the proposal, or reject the proposal. You must accept or reject after thinking. You cannot make proposals of your own.
-The agent may make a partial proposal, which will contain a [propose] tag, but not all three non-null items, which you will need to respond to by messaging.
-(Example thinking action: [think] All the events are very close to each other and the score is a lot better. My total score seems like it could be pretty good. I should accept this proposal.)
-(Example accept action: [accept])
-(Example reject action: [reject])
-Only take one action per turn (for example, do not send a message and reject a proposal at the same time). 
-Do not write any other text besides your action and the associated text. Do not assign yourself a final score.
-
 CITY 1.
 Travel Preferences:
 check out live music!

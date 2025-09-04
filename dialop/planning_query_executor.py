@@ -190,7 +190,7 @@ class GPTQueryExecutor:
             model=self.metadata['model_name'],
             app_name=self.metadata['name'],
             requests=[{"messages": [{'role': 'user', 'content': self.prompt}], **self.model_kwargs}],
-            max_tokens=min(remaining, MAX_RESPONSE_LENGTH)
+            max_tokens=256
         )[0]['response']
         print(response)
         return response["text"][0].strip()

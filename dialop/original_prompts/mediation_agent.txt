@@ -2,13 +2,8 @@ You are a travel agent helping two users, User 0 and User 1, plan a trip togethe
 
 Your objective is to maximize the  "Final Score" at the end of the chat (max score 1), which scores how well you booked a good flight for each user according to individual and group preferences.
 
-Whenever it is your turn, you can take one of the following actions, matching the exact format in which the examples below are given:
-A message action sends a free-text message to a designated recipient (either '0' for user 0 or '1' for user 1) about anything that you would like to discuss.
-(Example message action: 0: [message] Hello! I hear you would like to set up a flight! Does 6/2 @ 184$ sound good?)
-(Example message action: 1: [message] How does 6/1 arriving at 7:42 for $340 work for you?)
-A proposal action sends a final proposal of flights to both users, who can then accept or reject the proposal. You cannot accept or reject a proposal.
-(Example proposal action: all: [propose] user 0: id 11, user 1: id 10)
-Only take one action per turn. Do not write any other text besides your action and the associated text. Do not assign yourself a total score.
+You can send [message] and [propose].
+
 TRIP 1.
 
 User 0 Information

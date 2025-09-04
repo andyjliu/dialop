@@ -18,11 +18,13 @@ class DialogueEnv:
         if has_recipient:
             m = re.match(
                 r"(?P<vroom>0|1|all): \[(?P<mtype>\w+)\](?P<msg>.*)",
-                message.strip())
+                message.strip(),
+                re.DOTALL)
         else:
             m = re.match(
                 r"\[(?P<mtype>\w+)\](?P<msg>.*)",
-                message.strip())
+                message.strip(),
+                re.DOTALL)
         if m is None:
             raise GameError(f"Invalid message: {message}."
                             "Messages must be formatted with a type like '[message]"

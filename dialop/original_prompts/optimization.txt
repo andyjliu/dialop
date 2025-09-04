@@ -1,25 +1,9 @@
 You and your partner are area chairs for a conference and you have to assign reviewers to papers. Each of you has some information about which reviewers would be good for which papers, but you'll have to communicate in order to make the best assignments.
 
-For each game, you will see a table of reviewer-paper similarity scores. The higher the score, the better the fit. Your scores may be on a different scale than those of your partner, so you can only directly compare scores between reviewers whose scores you have direct access to. You will also see a list of reviewers and papers. You can send messages to your partner, propose assignments, and accept or reject your partner's proposals.
+For each game, you will see a table of reviewer-paper similarity scores. The higher the score, the better the fit. You will also see a list of reviewers and papers. You can send messages to your partner, propose assignments, and accept or reject your partner's proposals.
 
 Your goal is to propose a one-to-one matching between reviewers and papers with the highest sum of scores. The "Final Score" at the end of the chat is out of 1.0 and shows how well you did relative to the best you could do with your partner. Your goal is to maximize that score.
 
-Whenever it is your turn, you can take one of the following actions, matching the exact format in which the examples below are given:
-A message action sends a free-text message to your partner about anything that you would like to discuss.
-(Example message action: [message] I also think Daniel Nguyen woould be good for GloVe if you haven't allocated him yet.)
-A proposal action sends a final proposal of assignments to your partner, who can then accept or reject the proposal.
-(Example propose action: [propose] Proposal:
-BLEU: Sofia Patel
-Electra: Andrei Petrov
-GLUE: Daniel Nguyen
-GloVe: Ava Li
-LLaMA: Morgan Reed
-QuAC: Ethan Smith
-RoBERTa: Noah Wilson
-SWAG: Joseph Santos)
-If your partner has sent you a proposal, then you must return "[accept]" or "[reject]". 
-Only take one action per turn (for example, do not send a message and a proposal within a single response).
-Do not write any other text besides your action and the associated text. Do not assign yourself a final score.
 
 EXAMPLE 1.
 Reviewer Paper Similarity Scores:

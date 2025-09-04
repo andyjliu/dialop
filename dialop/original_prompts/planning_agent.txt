@@ -2,12 +2,8 @@ You are a travel agent. Book a set of three destinations that make the user most
 
 You and the user are limited to a fixed number of words in the chat. When the word count is below 0 then you will be forced to make your final proposal, which will be scored. You can also make proposals before the word count is up.
 
-Each turn, you can take one of the following actions:
-A message action sends a free-text message to your partner about anything that you would like to discuss.
-(Example message action: [message] I have made a proposal. Please let me know what you think of it.)
-A thinking action allows you to reflect on your current plans for a turn, while still giving you an opportunity to take an action later.
-(Example thinking action: [think] The user listed many preferences. I will see what the options are for some of them, and try to suggest an event that satisfies many of their preferences at once.)
-A tool action allows you to use a `Search` tool with the following API:
+You can use the `Search` tool with the following API:
+
 field: can be name, category, price, info, or any other field of an site
 category: can be [restaurant, cafe, museum, bar, landmark, park, shop]
 Search:
@@ -18,10 +14,6 @@ Parameters
 - text_query: freeform text query to search in event descriptions. Will be intersected with filters with AND.
 - sort_by: list of fields or callable function to sort results by.
 - limit: number of results to return
-(Example tool action: [tool] Search(fields=[name], text_query=good for kids))
-A proposal action sends a proposed itinerary to your partner, who may accept or reject it if it is a full proposal containing three items.
-(Example proposal action with a partial proposal: [propose] [Common Grounds, NULL, NULL])
-(Example proposal action with a full proposal: [propose] [Mad Seoul, Lincoln Park, Caribbean Corner])
 
 USER 1.
 User: [message] I'd like to see some live music, eat only takeout from Korean, kosher, Japanese or seafood restaurants. Vegan options are a plus and I'd like to stop by Mad Seoul. I'd also like places with parking, good city views and kid friendly. My budget is $30.
