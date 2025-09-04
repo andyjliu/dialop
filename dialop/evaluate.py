@@ -263,27 +263,22 @@ def main():
     parser.add_argument('--temperature', type=float, default=0.1, help='Model temperature')
     parser.add_argument('--dry_run', type=lambda x: (str(x).lower() == 'true'), default=False, help='Dry run mode')
     parser.add_argument('--use_word_limit', type=lambda x: (str(x).lower() == 'true'), default=False, help='Use word limit')
-    parser.add_argument('--model', type=str, default=None, help='Model name')
+    parser.add_argument('--user_model', type=str, default=None, help='User model name')
+    parser.add_argument('--agent_model', type=str, default=None, help='Agent model name')
     parser.add_argument('--wandb', type=lambda x: (str(x).lower() == 'true'), default=False, help='Use wandb')
     parser.add_argument('--wandb_project', type=str, default='dialop', help='Wandb project name')
 
     args = parser.parse_args()
 
-    exp_name = args.exp_name
-    game = args.game
-    mode = args.mode
-    resume = args.resume
-    end = args.end
-    samples_per_game = args.samples_per_game
-    temperature = args.temperature
+    # Assign variables to args if used in main() or its inner functions
     dry_run = args.dry_run
     use_word_limit = args.use_word_limit
-    model = args.model
-    wandb = args.wandb
-    wandb_project = args.wandb_project
+    user_model = args.user_model
+    agent_model = args.agent_model
+    temperature = args.temperature
 
-    game_cls = GAME_CLSS[game]
-    EXP_DIR = RESDIR / game
+    game_cls = GAME_CLSS[args.game]
+    EXP_DIR = RESDIR / args.game
     if game_cls == OptimizationEnv:
         DATA_PATH = DATADIR / "optimization.jsonl"
     elif game_cls == PlanningEnv:
@@ -291,17 +286,17 @@ def main():
     elif game_cls == MediationEnv:
         DATA_PATH = DATADIR / "mediation.jsonl"
 
-    os.makedirs(EXP_DIR / exp_name, exist_ok=True)
+    os.makedirs(EXP_DIR / args.exp_name, exist_ok=True)
     with open(DATA_PATH) as f:
         games = []
         for line in f:
             games.append(json.loads(line))
 
     # Create generator for eval mode.
-    if mode == "selfplay":
-        gen = selfplay(game_cls, games, samples_per_game, resume, end)
-    elif mode == "prompted_sp":
-        gen = prompted_selfplay(game_cls, games, samples_per_game, resume, end)
+    if args.mode == "selfplay":
+        gen = selfplay(game_cls, games, args.samples_per_game, args.resume, args.end)
+    elif args.mode == "prompted_sp":
+        gen = prompted_selfplay(game_cls, games, args.samples_per_game, args.resume, args.end)
     else:
         raise NotImplementedError()
 
@@ -348,24 +343,24 @@ def main():
                        p2:  DryRunPlayer(p2_prompt, p2, console)}
         elif game_cls == MediationEnv:
             players = {p1: LLMPlayer(user0_prompt, p1, console,
-                                     model=model,
+                                     model=user_model,
                                      model_kwargs={"temperature": temperature}),
                        p2:  LLMPlayer(user1_prompt, p2, console,
-                                      model=model,
+                                      model=user_model,
                                       model_kwargs={"temperature": temperature}),
                        p3:  LLMPlayer(agent_prompt, p3, console,
                                       prefix="\nYou to",
                                       optional=optional,
-                                      model=model,
+                                      model=agent_model,
                                       model_kwargs={"temperature": temperature})}
         else:
             players = {p1: LLMPlayer(p1_prompt, p1, console,
                                      optional=optional1,
-                                     model=model,
+                                     model=agent_model,
                                      model_kwargs={"temperature": temperature}),
                        p2:  LLMPlayer(p2_prompt, p2, console,
                                       optional=optional2,
-                                      model=model,
+                                      model=user_model,
                                       model_kwargs={"temperature": temperature})}
         return players
 
@@ -395,7 +390,7 @@ def main():
     # Evaluate.
     times = []
     for i, (data, fname, metadata) in enumerate(gen):
-        if (EXP_DIR / exp_name / f"{fname}.out").exists():
+        if (EXP_DIR / args.exp_name / f"{fname}.out").exists():
             continue
         if not dry_run and i % 20 == 1:
             print(f"Sleeping... {np.mean(times):.1f}")
@@ -410,7 +405,7 @@ def main():
             metadata,
             create_players,
             create_env,
-            EXP_DIR / exp_name /f"{fname}.out",
+            EXP_DIR / args.exp_name /f"{fname}.out",
             use_word_limit=use_word_limit,
             max_length=max_length,
         )
@@ -418,12 +413,12 @@ def main():
         times.append(elapsed)
         print(f" == Finished {i} {elapsed:.1f} == ")
 
-    if not exp_name:
-        exp_name = make_exp_name(exp_name)
-    avg_metrics = aggregate_metrics(EXP_DIR, exp_name)
-    if wandb:
+    if not args.exp_name:
+        args.exp_name = make_exp_name(args.exp_name)
+    avg_metrics = aggregate_metrics(EXP_DIR, args.exp_name)
+    if args.wandb:
         args_dict = vars(args)
-        write_to_wandb(avg_metrics, args_dict, wandb_project=wandb_project, exp_name=exp_name)
+        write_to_wandb(avg_metrics, args_dict, wandb_project=args.wandb_project, exp_name=args.exp_name)
     
     exit()
 

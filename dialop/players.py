@@ -48,19 +48,9 @@ class LLMPlayer:
         self.model = model
         self.optional = optional
         self.removed_optional = False
-        if self.role in ["user", "agent", "user0", "user1"]:
-            stop_tokens = ["User", "Agent", "You", "\n"]
-        elif self.role in ["player-1", "player-2"]:
-            stop_tokens = ["Partner", "You", "\n"]
-        else:
-            raise NotImplementedError
         self.model_kwargs = dict(
-            model=self.model,
             temperature=0.1,
-            top_p=.95,
-            frequency_penalty=0,
-            presence_penalty=0,
-            stop=stop_tokens,
+            top_p=.95
         )
         if model_kwargs is not None:
             self.model_kwargs.update(**model_kwargs)
@@ -88,8 +78,9 @@ class LLMPlayer:
             url=self.metadata['endpoints']['head'],
             model=self.metadata['model_name'],
             app_name=self.metadata['name'],
-            requests=[{"messages": [{'role': 'user', 'content': self.prompt}], **self.model_kwargs}],
-            max_tokens=min(remaining, MAX_RESPONSE_LENGTH)
+            requests=[{"messages": [{'role': 'user', 'content': self.prompt}]}],
+            max_tokens=min(remaining, MAX_RESPONSE_LENGTH),
+            **self.model_kwargs
         )[0]['response']
         
         self.console.print("Response: ",
@@ -103,8 +94,9 @@ class LLMPlayer:
                 url=self.metadata['endpoints']['head'],
                 model=self.metadata['model_name'],
                 app_name=self.metadata['name'],
-                requests=[{"messages": [{'role': 'user', 'content': self.prompt}], **self.model_kwargs}],
-                max_tokens=min(remaining, MAX_RESPONSE_LENGTH)
+                requests=[{"messages": [{'role': 'user', 'content': self.prompt}]}],
+                max_tokens=min(remaining, MAX_RESPONSE_LENGTH),
+                **self.model_kwargs
             )
             self.console.print("Response: ",
                                escape(response["text"][0].strip()))
