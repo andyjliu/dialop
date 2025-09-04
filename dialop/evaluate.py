@@ -262,6 +262,7 @@ def main(
     dry_run: Optional[bool]=False,
     use_word_limit: Optional[bool]=False,
     model: Optional[str]=None,
+    fewshot: Optional[bool]=False,
 ):
 
     game_cls = GAME_CLSS[game]
@@ -290,16 +291,11 @@ def main(
     def create_players():
         print("Initializing players...")
         # Create prompts.
+
         if game_cls == OptimizationEnv:
             with open(FPATH / "prompts" / "optimization.txt") as f:
                 matching_prompt = f.read()
         elif game_cls == PlanningEnv:
-            # if use_word_limit:
-            #     with open(FPATH / "prompts" / "itinerary_agent_timed.txt") as f:
-            #         agent_prompt = f.read()
-            #     with open(FPATH / "prompts" / "itinerary_user_timed.txt") as f:
-            #         user_prompt = f.read()
-            # else:
             with open(FPATH / "prompts" / "planning_agent.txt") as f:
                 agent_prompt = f.read()
             with open(FPATH / "prompts" / "planning_user.txt") as f:
@@ -312,23 +308,45 @@ def main(
             with open(FPATH / "prompts" / "mediation_user1.txt") as f:
                 user1_prompt = f.read()
 
+        # Extract core instructions for each game type
         if game_cls == OptimizationEnv:
             p1, p2 = "player-1", "player-2"
             p1_prompt, p2_prompt = matching_prompt, matching_prompt
-            optional1 = p1_prompt[
-                p1_prompt.index("EXAMPLE 1"):]
-            optional1 = optional1[:optional1.index("EXAMPLE 2")]
-            optional2 = p2_prompt[
-                p2_prompt.index("EXAMPLE 2"):]
-            optional2 = optional2[:optional2.index("EXAMPLE 2")]
+            # Assume core instructions are before EXAMPLE 1
+            core_instructions = matching_prompt[:matching_prompt.index("EXAMPLE 1")] if "EXAMPLE 1" in matching_prompt else matching_prompt
+            if fewshot:
+                optional1 = p1_prompt[p1_prompt.index("EXAMPLE 1"):]
+                optional1 = optional1[:optional1.index("EXAMPLE 2")]
+                optional2 = p2_prompt[p2_prompt.index("EXAMPLE 2"):]
+                optional2 = optional2[:optional2.index("EXAMPLE 2")]
+            else:
+                p1_prompt = core_instructions
+                p2_prompt = core_instructions
+                optional1, optional2 = None, None
         elif game_cls == PlanningEnv:
             p1, p2 = "agent", "user"
             p1_prompt, p2_prompt = agent_prompt, user_prompt
+            # Assume core instructions are before "User: [message]" and "Travel Preferences:"
+            core_instructions = agent_prompt[:agent_prompt.index("User: [message]")] if "User: [message]" in agent_prompt else agent_prompt
+            core_instructions_user = user_prompt[:user_prompt.index("Travel Preferences:")] if "Travel Preferences:" in user_prompt else user_prompt
+            if not fewshot:
+                p1_prompt = core_instructions
+                p2_prompt = core_instructions_user
             optional1, optional2 = None, None
         elif game_cls == MediationEnv:
             p1, p2, p3 = "user0", "user1", "agent"
-            optional = agent_prompt[agent_prompt.index("User 0 Information"):]
-            optional = optional[:optional.index("\n\n") + 2]
+            # Assume core instructions are before "User 0 Information" and "Flights:"
+            core_instructions = agent_prompt[:agent_prompt.index("User 0 Information")] if "User 0 Information" in agent_prompt else agent_prompt
+            core_instructions_user0 = user0_prompt[:user0_prompt.index("Flights:")] if "Flights:" in user0_prompt else user0_prompt
+            core_instructions_user1 = user1_prompt[:user1_prompt.index("Flights:")] if "Flights:" in user1_prompt else user1_prompt
+            if fewshot:
+                optional = agent_prompt[agent_prompt.index("User 0 Information"):]
+                optional = optional[:optional.index("\n\n") + 2]
+            else:
+                agent_prompt = core_instructions
+                user0_prompt = core_instructions_user0
+                user1_prompt = core_instructions_user1
+                optional = None
 
         if dry_run:
             assert game_cls != MediationEnv
@@ -337,24 +355,29 @@ def main(
         elif game_cls == MediationEnv:
             players = {p1: LLMPlayer(user0_prompt, p1, console,
                                      model=model,
-                                     model_kwargs={"temperature": temperature}),
+                                     model_kwargs={"temperature": temperature},
+                                     instructions=core_instructions_user0),
                        p2:  LLMPlayer(user1_prompt, p2, console,
                                       model=model,
-                                      model_kwargs={"temperature": temperature}),
+                                      model_kwargs={"temperature": temperature},
+                                      instructions=core_instructions_user1),
                        p3:  LLMPlayer(agent_prompt, p3, console,
                                       prefix="\nYou to",
                                       optional=optional,
                                       model=model,
-                                      model_kwargs={"temperature": temperature})}
+                                      model_kwargs={"temperature": temperature},
+                                      instructions=core_instructions)}
         else:
             players = {p1: LLMPlayer(p1_prompt, p1, console,
                                      optional=optional1,
                                      model=model,
-                                     model_kwargs={"temperature": temperature}),
+                                     model_kwargs={"temperature": temperature},
+                                     instructions=core_instructions),
                        p2:  LLMPlayer(p2_prompt, p2, console,
                                       optional=optional2,
                                       model=model,
-                                      model_kwargs={"temperature": temperature})}
+                                      model_kwargs={"temperature": temperature},
+                                      instructions=core_instructions)}
         return players
 
     def create_env():
@@ -407,19 +430,6 @@ def main(
         print(f" == Finished {i} {elapsed:.1f} == ")
 
     exit()
-
-    #with open("query_executor_prompt.txt", "w") as f:
-    #    f.write(env.search.prompt)
-    #test_queries = [
-    #    "Search(fields=[name], text_query='not touristy', filters=[category == restaurant]"
-    #]
-    #env.search(test_queries[0])
-
-    # Try scoring a proposal
-    #proposal = "[The Dive, Saul's, NULL]"
-    #proposal_info = env._propose(proposal)
-    #print(proposal_info)
-
 
 if __name__ == "__main__":
     tyro.cli(main)
