@@ -125,13 +125,8 @@ def prompted_selfplay(
             raise ValueError("Game doesn't include a proposal")
         turn_idxs.append(proposal_idx)
 
-        # import pdb; pdb.set_trace()
-        # for turn in range(0, len(data["action_log"])):
         names = ["50", "75", "end"]
-        # for turn in range(2, len(data["action_log"]) // 2):
-        #     end = 2 * (turn + 1)
         for name, end in zip(names, turn_idxs):
-            # if end >= len(game["games"][0]["action_log"]): continue
             data["action_log"] = original_log[:end]
             metadata = {
                 "initialized_turns": len(data["action_log"]),
@@ -145,7 +140,7 @@ def prompted_selfplay(
                 name = f"{game_idx + resume}_start{len(data['action_log'])}_{name}_{sidx}"
                 yield data, name, metadata
 
-# @retry(allowed_exceptions=[OutOfContextError, ResampleError])
+@retry(allowed_exceptions=[OutOfContextError, ResampleError])
 def run(
     game_cls,
     data,
@@ -267,6 +262,8 @@ def main():
     parser.add_argument('--agent_model', type=str, default=None, help='Agent model name')
     parser.add_argument('--wandb', type=lambda x: (str(x).lower() == 'true'), default=False, help='Use wandb')
     parser.add_argument('--wandb_project', type=str, default='dialop', help='Wandb project name')
+    parser.add_argument('--fewshot', type=lambda x: (str(x).lower() == 'true'), default=False, help='Include fewshot examples in prompt')
+    parser.add_argument('--instruction_reminder', type=lambda x: (str(x).lower() == 'true'), default=False, help='Append instructions to end of prompt')
 
     args = parser.parse_args()
 
@@ -276,6 +273,8 @@ def main():
     user_model = args.user_model
     agent_model = args.agent_model
     temperature = args.temperature
+    fewshot = args.fewshot
+    instruction_reminder = args.instruction_reminder
 
     game_cls = GAME_CLSS[args.game]
     EXP_DIR = RESDIR / args.game
@@ -318,24 +317,44 @@ def main():
                 user0_prompt = f.read()
             with open(FPATH / "prompts" / "mediation_user1.txt") as f:
                 user1_prompt = f.read()
-
         if game_cls == OptimizationEnv:
             p1, p2 = "player-1", "player-2"
-            p1_prompt, p2_prompt = matching_prompt, matching_prompt
-            optional1 = p1_prompt[
-                p1_prompt.index("EXAMPLE 1"):]
-            optional1 = optional1[:optional1.index("EXAMPLE 2")]
-            optional2 = p2_prompt[
-                p2_prompt.index("EXAMPLE 2"):]
-            optional2 = optional2[:optional2.index("EXAMPLE 2")]
+            instr1 = matching_prompt[:matching_prompt.index("EXAMPLE 1")]
+            optional1 = matching_prompt[matching_prompt.index("EXAMPLE 1"):matching_prompt.index("EXAMPLE 2")]
+            instr2 = matching_prompt[:matching_prompt.index("EXAMPLE 1")]
+            optional2 = matching_prompt[matching_prompt.index("EXAMPLE 1"):matching_prompt.index("EXAMPLE 2")]
+
+            p1_prompt = matching_prompt if fewshot else instr1
+            p2_prompt = matching_prompt if fewshot else instr2
+            optional1 = optional1 if fewshot else None
+            optional2 = optional2 if fewshot else None
+            p1_instruction_val = instr1 if instruction_reminder else None
+            p2_instruction_val = instr2 if instruction_reminder else None
+
         elif game_cls == PlanningEnv:
             p1, p2 = "agent", "user"
-            p1_prompt, p2_prompt = agent_prompt, user_prompt
-            optional1, optional2 = None, None
+            p1_prompt = agent_prompt if fewshot else agent_prompt.split("USER 1")[0]
+            p2_prompt = user_prompt if fewshot else user_prompt.split("CITY 1")[0]
+            optional1 = None
+            optional2 = None
+            p1_instruction_val = agent_prompt.split("USER 1")[0] if instruction_reminder else None
+            p2_instruction_val = user_prompt.split("CITY 1")[0] if instruction_reminder else None
+
         elif game_cls == MediationEnv:
             p1, p2, p3 = "user0", "user1", "agent"
-            optional = agent_prompt[agent_prompt.index("User 0 Information"):]
-            optional = optional[:optional.index("\n\n") + 2]
+            instr_agent = agent_prompt[:agent_prompt.index("TRIP 1.")] if "TRIP 1." in agent_prompt else agent_prompt
+            instr_user0 = user0_prompt[:user0_prompt.index("TRIP 1.")] if "TRIP 1." in user0_prompt else user0_prompt
+            instr_user1 = user1_prompt[:user1_prompt.index("TRIP 1.")] if "TRIP 1." in user1_prompt else user1_prompt
+
+            optional_agent = agent_prompt[agent_prompt.index("TRIP 1."):]
+            agent_prompt_val = agent_prompt if fewshot else instr_agent
+            user0_prompt_val = user0_prompt if fewshot else instr_user0
+            user1_prompt_val = user1_prompt if fewshot else instr_user1
+            
+            optional_agent = optional_agent if fewshot else None
+            instr_agent = instr_agent if instruction_reminder else None
+            instr_user0 = instr_user0 if instruction_reminder else None
+            instr_user1 = instr_user1 if instruction_reminder else None
 
         if dry_run:
             assert game_cls != MediationEnv
@@ -344,24 +363,29 @@ def main():
         elif game_cls == MediationEnv:
             players = {p1: LLMPlayer(user0_prompt, p1, console,
                                      model=user_model,
-                                     model_kwargs={"temperature": temperature}),
+                                     model_kwargs={"temperature": temperature},
+                                     instruction=instr_user0),
                        p2:  LLMPlayer(user1_prompt, p2, console,
                                       model=user_model,
-                                      model_kwargs={"temperature": temperature}),
-                       p3:  LLMPlayer(agent_prompt, p3, console,
+                                      model_kwargs={"temperature": temperature},
+                                      instruction=instr_user1),
+                       p3:  LLMPlayer(agent_prompt_val, p3, console,
                                       prefix="\nYou to",
-                                      optional=optional,
+                                      optional=optional_agent,
                                       model=agent_model,
-                                      model_kwargs={"temperature": temperature})}
+                                      model_kwargs={"temperature": temperature},
+                                      instruction=instr_agent)}
         else:
             players = {p1: LLMPlayer(p1_prompt, p1, console,
                                      optional=optional1,
                                      model=agent_model,
-                                     model_kwargs={"temperature": temperature}),
+                                     model_kwargs={"temperature": temperature},
+                                     instruction=p1_instruction_val),
                        p2:  LLMPlayer(p2_prompt, p2, console,
                                       optional=optional2,
                                       model=user_model,
-                                      model_kwargs={"temperature": temperature})}
+                                      model_kwargs={"temperature": temperature},
+                                      instruction=p2_instruction_val)}
         return players
 
     def create_env():

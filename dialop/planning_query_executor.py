@@ -184,7 +184,7 @@ class GPTQueryExecutor:
         return prompt
 
     def __call__(self, query_str):
-        prompt = self.prompt + f"Query: {query_str}\nResult:\n"
+        prompt = self.prompt + f"Query: {query_str}\nDo not return any other text, only the search results.\nResult:\n"
         response = query_llm.batch_requests(
             url=self.metadata['endpoints']['head'],
             model=self.metadata['model_name'],

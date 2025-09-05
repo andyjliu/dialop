@@ -41,7 +41,7 @@ class DryRunPlayer:
 class LLMPlayer:
 
     def __init__(self, prompt, role, console, model='gpt-4o', model_kwargs=None,
-                 prefix="\nYou:", optional=None):
+                 prefix="\nYou:", optional=None, instruction=None):
         self.prompt = prompt
         self.role = role
         self.console = console
@@ -55,6 +55,8 @@ class LLMPlayer:
         if model_kwargs is not None:
             self.model_kwargs.update(**model_kwargs)
         self.prefix = prefix
+        self.suffix = "\nReminder: " + instruction + "\nIt is now your turn to continue the interaction." \
+        if instruction else "\nIt is now your turn to continue the interaction."
         self.metadata = Cli().get_app_metadata(app_name=self.model)
 
     def observe(self, obs):
@@ -62,23 +64,24 @@ class LLMPlayer:
 
     def respond(self):
         self.console.rule(f"{self.role}'s turn")
-        if not self.prompt.endswith(self.prefix):
-            self.prompt += self.prefix
-        #self.console.print(escape(self.prompt))
-        remaining = MAX_PROMPT_LENGTH - num_tokens(self.prompt)
+        remaining = MAX_PROMPT_LENGTH - num_tokens(self.prompt) - num_tokens(self.suffix)
         if remaining < 0 and self.optional:
             self._remove_optional_context()
-            remaining = MAX_PROMPT_LENGTH - num_tokens(self.prompt)
+            remaining = MAX_PROMPT_LENGTH - num_tokens(self.prompt) - num_tokens(self.suffix)
+
         # Still out of context after removing
         if remaining < 0:
             print("OUT OF CONTEXT! Remaining ", remaining)
             raise OutOfContextError()
-            
+        prompt_to_send = self.prompt + self.suffix
+        if not prompt_to_send.endswith(self.prefix):
+            prompt_to_send += self.prefix
+
         response = query_llm.batch_requests(
             url=self.metadata['endpoints']['head'],
             model=self.metadata['model_name'],
             app_name=self.metadata['name'],
-            requests=[{"messages": [{'role': 'user', 'content': self.prompt}]}],
+            requests=[{"messages": [{'role': 'user', 'content': prompt_to_send}]}],
             max_tokens=min(remaining, MAX_RESPONSE_LENGTH),
             **self.model_kwargs
         )[0]['response']
@@ -90,17 +93,22 @@ class LLMPlayer:
             if not self.optional:
                 raise OutOfContextError()
             self._remove_optional_context()
+            prompt_to_send = self.prompt + self.suffix
+            if not prompt_to_send.endswith(self.prefix):
+                prompt_to_send += self.prefix
+
             response = query_llm.batch_requests(
                 url=self.metadata['endpoints']['head'],
                 model=self.metadata['model_name'],
                 app_name=self.metadata['name'],
-                requests=[{"messages": [{'role': 'user', 'content': self.prompt}]}],
+                requests=[{"messages": [{'role': 'user', 'content': prompt_to_send}]}],
                 max_tokens=min(remaining, MAX_RESPONSE_LENGTH),
                 **self.model_kwargs
-            )
+            )[0]['response']
             self.console.print("Response: ",
                                escape(response["text"][0].strip()))
             self.console.print("stop: ", response["finish_reason"][0])
+
         self.console.print(response["usage"])
         return response["text"][0].strip()
 
@@ -124,7 +132,6 @@ class HumanPlayer:
 
     def observe(self, obs):
         self.prompt += obs
-
     def respond(self):
         if not self.prompt.endswith(self.prefix):
             self.prompt += self.prefix

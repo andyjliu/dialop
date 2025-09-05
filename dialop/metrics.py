@@ -58,7 +58,7 @@ def aggregate_metrics(exp_dir: str, exp_name: str) -> Dict[str, float]:
             for key in EXPECTED_KEYS:
                 if metrics[key] != DUMMY_VALUE:
                     metric_sums[key] += float(metrics[key])
-                    metric_counts[key] += 1
+                metric_counts[key] += 1
     avg_metrics = {}
     for key in EXPECTED_KEYS:
         if metric_counts[key] > 0:

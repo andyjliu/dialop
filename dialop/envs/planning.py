@@ -97,7 +97,7 @@ class PlanningEnv(DialogueEnv):
             elif type_ == "tool":
                 assert player == "agent", "User cannot use tool."
                 result = self._call_tool(content)
-                obss = ["", f"{message}\n{result}"]
+                obss = ["", f"\n{message}\n{result}"]
             elif type_ == "propose":
                 self.num_msgs += 1
                 if player != "agent":

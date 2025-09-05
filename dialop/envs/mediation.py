@@ -63,7 +63,7 @@ class MediationEnv(DialogueEnv):
                 obss = ["", "", ""]
                 if player == "agent":
                     obss[vroom] = f"\nAgent: [message] {content}"
-                    obss[2] = f" {vroom}: [message] {content}"
+                    obss[2] = f"\nYou to {vroom}: [message] {content}"
                 else:
                     obss[vroom] = message
                     obss[2] = f"\nUser {vroom}: {message}"
